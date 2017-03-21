@@ -592,6 +592,7 @@ qq.UploadHandlerController = function(o, namespace) {
          * Sends the file identified by id
          */
         upload: function(id) {
+            handler._getFileState(id).paused = false;
             if (connectionManager.open(id)) {
                 return upload.start(id);
             }

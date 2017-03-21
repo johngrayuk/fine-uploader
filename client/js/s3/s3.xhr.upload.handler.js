@@ -109,7 +109,7 @@ qq.s3.XhrUploadHandler = function(spec, proxy) {
                         log(qq.format("Upload of item {}.{} cancelled. Upload will not start after successful signature request.", id, chunkIdx));
                         promise.failure({error: "Chunk upload cancelled"});
                     }
-                    else {
+                    else if (!handler._getFileState(id).paused){
                         var url = domain + "/" + endOfUrl;
                         handler._registerProgressHandler(id, chunkIdx, chunkData.size);
                         upload.track(id, xhr, chunkIdx).then(promise.success, promise.failure);
