@@ -118,7 +118,8 @@ qq.XhrUploadHandler = function(spec) {
                     name: uploadData.name,
                     remaining: uploadData.chunking.remaining,
                     size: uploadData.size,
-                    uuid: uploadData.uuid
+                    uuid: uploadData.uuid,
+                    loaded: uploadData.loaded
                 };
 
                 if (uploadData.key) {
