@@ -18,15 +18,22 @@ qq.s3.XhrUploadHandler = function(spec, proxy) {
         onGetBucket = spec.getBucket,
         onGetHost = spec.getHost,
         onGetKeyName = spec.getKeyName,
+        onGetRegion = spec.getRegion,
+        onGetSignatureEndpoint = spec.signature.getEndpoint,
         filenameParam = spec.filenameParam,
         paramsStore = spec.paramsStore,
         endpointStore = spec.endpointStore,
         aclStore = spec.aclStore,
         reducedRedundancy = spec.objectProperties.reducedRedundancy,
-        region = spec.objectProperties.region,
         serverSideEncryption = spec.objectProperties.serverSideEncryption,
         validation = spec.validation,
-        signature = qq.extend({region: region, drift: clockDrift}, spec.signature),
+        signature = {
+            customHeaders: spec.customHeaders,
+            version: spec.version,
+            drift: clockDrift,
+            getEndpoint: qq.bind(function (id) { return this.upload.signatureEndpoint.getName(id); }, this),
+            getRegion: qq.bind(function (id) { return this.upload.region.getName(id); }, this)
+        },
         handler = this,
         credentialsProvider = spec.signature.credentialsProvider,
 
@@ -290,7 +297,7 @@ qq.s3.XhrUploadHandler = function(spec, proxy) {
                     minFileSize: validation.minSizeLimit,
                     maxFileSize: validation.maxSizeLimit,
                     reducedRedundancy: reducedRedundancy,
-                    region: region,
+                    region: upload.region.getName(id),
                     serverSideEncryption: serverSideEncryption,
                     signatureVersion: signature.version,
                     log: log
@@ -408,6 +415,52 @@ qq.s3.XhrUploadHandler = function(spec, proxy) {
 
                 getName: function(id) {
                     return handler._getFileState(id).host;
+                }
+            },
+
+            region: {
+                promise: function(id) {
+                    var promise = new qq.Promise(),
+                        cachedRegion = handler._getFileState(id).region;
+
+                    if (cachedRegion) {
+                        promise.success(cachedRegion);
+                    }
+                    else {
+                        onGetRegion(id).then(function(region) {
+                            handler._getFileState(id).region = region;
+                            promise.success(region);
+                        }, promise.failure);
+                    }
+
+                    return promise;
+                },
+
+                getName: function(id) {
+                    return handler._getFileState(id).region;
+                }
+            },
+
+            signatureEndpoint: {
+                promise: function(id) {
+                    var promise = new qq.Promise(),
+                        cachedSignatureEndpoint = handler._getFileState(id).signatureEndpoint;
+
+                    if (cachedSignatureEndpoint) {
+                        promise.success(cachedSignatureEndpoint);
+                    }
+                    else {
+                        onGetSignatureEndpoint(id).then(function(signatureEndpoint) {
+                            handler._getFileState(id).signatureEndpoint = signatureEndpoint;
+                            promise.success(signatureEndpoint);
+                        }, promise.failure);
+                    }
+
+                    return promise;
+                },
+
+                getName: function(id) {
+                    return handler._getFileState(id).signatureEndpoint;
                 }
             },
 
@@ -534,14 +587,30 @@ qq.s3.XhrUploadHandler = function(spec, proxy) {
                 upload.key.promise(id).then(function() {
                     upload.bucket.promise(id).then(function() {
                         upload.host.promise(id).then(function() {
-                            /* jshint eqnull:true */
-                            if (optChunkIdx == null) {
-                                simple.send(id).then(promise.success, promise.failure);
-                            }
-                            else {
-                                chunked.send(id, optChunkIdx).then(promise.success, promise.failure);
-                            }
+                            upload.region.promise(id).then(function() {
+                                upload.signatureEndpoint.promise(id).then(function() {
+                                    /* jshint eqnull:true */
+                                    if (optChunkIdx == null) {
+                                        simple.send(id).then(promise.success, promise.failure);
+                                    }
+                                    else {
+                                        chunked.send(id, optChunkIdx).then(promise.success, promise.failure);
+                                    }
+                                },
+                                function(errorReason) {
+                                    promise.failure({error: errorReason});
+                                });
+                            },
+                            function(errorReason) {
+                                promise.failure({error: errorReason});
+                            });
+                        },
+                        function(errorReason) {
+                            promise.failure({error: errorReason});
                         });
+                    },
+                    function(errorReason) {
+                        promise.failure({error: errorReason});
                     });
                 },
                 function(errorReason) {

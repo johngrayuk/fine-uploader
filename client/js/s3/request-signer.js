@@ -31,7 +31,8 @@ qq.s3.RequestSigner = function(o) {
             signatureSpec: {
                 drift: 0,
                 credentialsProvider: {},
-                endpoint: null,
+                getEndpoint: function (id) { return null; },
+                getRegion: function (id) { return null; },
                 customHeaders: {},
                 version: 2
             },
@@ -53,7 +54,7 @@ qq.s3.RequestSigner = function(o) {
                 headers.Authorization = qq.s3.util.V4_ALGORITHM_PARAM_VALUE +
                     " Credential=" + options.signatureSpec.credentialsProvider.get().accessKey + "/" +
                     qq.s3.util.getCredentialsDate(signatureConstructor.getRequestDate()) + "/" +
-                    options.signatureSpec.region + "/" +
+                    options.signatureSpec.getRegion(id) + "/" +
                     "s3/aws4_request," +
                     "SignedHeaders=" + signatureConstructor.getSignedHeaders() + "," +
                     "Signature=" + signature;
@@ -188,7 +189,7 @@ qq.s3.RequestSigner = function(o) {
                 var canonicalRequest = v4.getCanonicalRequest(signatureSpec),
                     date = qq.s3.util.getV4PolicyDate(signatureSpec.date, signatureSpec.drift),
                     hashedRequest = qq.CryptoJS.SHA256(canonicalRequest).toString(),
-                    scope = v4.getScope(signatureSpec.date, options.signatureSpec.region),
+                    scope = v4.getScope(signatureSpec.date, options.signatureSpec.getRegion(id)),
                     stringToSignTemplate = "AWS4-HMAC-SHA256\n{}\n{}\n{}";
 
                 return {
@@ -466,7 +467,7 @@ qq.s3.RequestSigner = function(o) {
         contentType: "application/json; charset=utf-8",
         endpointStore: {
             get: function() {
-                return options.signatureSpec.endpoint;
+                return options.signatureSpec.getEndpoint(id);
             }
         },
         paramsStore: options.paramsStore,

@@ -18,15 +18,22 @@ qq.s3.FormUploadHandler = function(options, proxy) {
         log = proxy.log,
         onGetBucket = options.getBucket,
         onGetKeyName = options.getKeyName,
+        onGetRegion = spec.getRegion,
+        onGetSignatureEndpoint = spec.signature.getEndpoint,
         filenameParam = options.filenameParam,
         paramsStore = options.paramsStore,
         endpointStore = options.endpointStore,
         aclStore = options.aclStore,
         reducedRedundancy = options.objectProperties.reducedRedundancy,
-        region = options.objectProperties.region,
         serverSideEncryption = options.objectProperties.serverSideEncryption,
         validation = options.validation,
-        signature = options.signature,
+        signature = {
+            customHeaders: spec.customHeaders,
+            version: spec.version,
+            drift: clockDrift,
+            getEndpoint: qq.bind(function (id) { return this.upload.signatureEndpoint.getValue(id); }, this),
+            getRegion: qq.bind(function (id) { return this.upload.region.getValue(id); }, this)
+        },
         successRedirectUrl = options.iframeSupport.localBlankPagePath,
         credentialsProvider = options.signature.credentialsProvider,
         getSignatureAjaxRequester = new qq.s3.RequestSigner({
@@ -98,7 +105,7 @@ qq.s3.FormUploadHandler = function(options, proxy) {
             maxFileSize: validation.maxSizeLimit,
             successRedirectUrl: successRedirectUrl,
             reducedRedundancy: reducedRedundancy,
-            region: region,
+            region: this.upload.region.getValue(id),
             serverSideEncryption: serverSideEncryption,
             signatureVersion: signature.version,
             log: log
@@ -201,28 +208,99 @@ qq.s3.FormUploadHandler = function(options, proxy) {
     }));
 
     qq.extend(this, {
+        upload: {
+            thirdPartyFileId: {
+                promise: function(id, name) {
+                    var promise = new qq.Promise(),
+                        cache = handler.getThirdPartyFileId(id);
+
+                    if (cache) {
+                        promise.success(cache);
+                    }
+                    else {
+                        onGetKeyName(id, name).then(function(key) {
+                            handler._setThirdPartyFileId(id, key);
+                            promise.success(key);
+                        }, promise.failure);
+                    }
+
+                    return promise;
+                }
+            },
+
+            bucket: {
+                promise: function(id) {
+                    var promise = new qq.Promise(),
+                        cache = handler._getFileState(id).bucket;
+
+                    if (cache) {
+                        promise.success(cache);
+                    }
+                    else {
+                        onGetBucket(id).then(function(bucket) {
+                            handler._getFileState(id).bucket = bucket;
+                            promise.success(bucket);
+                        }, promise.failure);
+                    }
+
+                    return promise;
+                }
+            },
+
+            region: {
+                promise: function(id) {
+                    var promise = new qq.Promise(),
+                        cache = handler._getFileState(id).region;
+
+                    if (cache) {
+                        promise.success(cache);
+                    }
+                    else {
+                        onGetRegion(id).then(function(region) {
+                            handler._getFileState(id).region = region;
+                            promise.success(region);
+                        }, promise.failure);
+                    }
+
+                    return promise;
+                },
+
+                getValue: function(id) {
+                    return handler._getFileState(id).region;
+                }
+            },
+
+            signatureEndpoint: {
+                promise: function(id) {
+                    var promise = new qq.Promise(),
+                        cache = handler._getFileState(id).signatureEndpoint;
+
+                    if (cache) {
+                        promise.success(cache);
+                    }
+                    else {
+                        onGetSignatureEndpoint(id).then(function(signatureEndpoint) {
+                            handler._getFileState(id).signatureEndpoint = signatureEndpoint;
+                            promise.success(signatureEndpoint);
+                        }, promise.failure);
+                    }
+
+                    return promise;
+                },
+
+                getValue: function(id) {
+                    return handler._getFileState(id).signatureEndpoint;
+                }
+            }
+        },
+
         uploadFile: function(id) {
             var name = getName(id),
                 promise = new qq.Promise();
 
-            if (handler.getThirdPartyFileId(id)) {
-                if (handler._getFileState(id).bucket) {
-                    handleUpload(id).then(promise.success, promise.failure);
-                }
-                else {
-                    onGetBucket(id).then(function(bucket) {
-                        handler._getFileState(id).bucket = bucket;
-                        handleUpload(id).then(promise.success, promise.failure);
-                    });
-                }
-            }
-            else {
-                // The S3 uploader module will either calculate the key or ask the server for it
-                // and will call us back once it is known.
-                onGetKeyName(id, name).then(function(key) {
-                    onGetBucket(id).then(function(bucket) {
-                        handler._getFileState(id).bucket = bucket;
-                        handler._setThirdPartyFileId(id, key);
+            upload.thirdPartyFileId.promise(id).then(function() {
+                upload.bucket.promise(id).then(function() {
+                    upload.signatureEndpoint.promise(id).then(function() {
                         handleUpload(id).then(promise.success, promise.failure);
                     }, function(errorReason) {
                         promise.failure({error: errorReason});
@@ -230,7 +308,9 @@ qq.s3.FormUploadHandler = function(options, proxy) {
                 }, function(errorReason) {
                     promise.failure({error: errorReason});
                 });
-            }
+            }, function(errorReason) {
+                promise.failure({error: errorReason});
+            });
 
             return promise;
         }

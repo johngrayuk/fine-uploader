@@ -201,9 +201,14 @@
                     getBucket: qq.bind(this._determineBucket, this),
                     getHost: qq.bind(this._determineHost, this),
                     getKeyName: qq.bind(this._determineKeyName, this),
+                    getRegion: qq.bind(this._determineRegion, this),
                     iframeSupport: this._options.iframeSupport,
                     objectProperties: this._options.objectProperties,
-                    signature: this._options.signature,
+                    signature: {
+                        customHeaders: this._options.signature.customHeaders,
+                        getEndpoint: qq.bind(this._determineSignatureEndpoint, this),
+                        version: this._options.signature.version
+                    },
                     clockDrift: this._options.request.clockDrift,
                     // pass size limit validation values to include in the request so AWS enforces this server-side
                     validation: {
@@ -285,8 +290,8 @@
             return qq.FineUploaderBasic.prototype._createUploadHandler.call(this, additionalOptions, "s3");
         },
 
-        _determineObjectPropertyValue: function(id, property) {
-            var maybe = this._options.objectProperties[property],
+        _determinePropertyValue: function(id, object, property) {
+            var maybe = object[property],
                 promise = new qq.Promise(),
                 self = this;
 
@@ -304,12 +309,24 @@
             }
 
             promise.then(
-                function success(value) {
-                    self["_" + property + "s"][id] = value;
-                },
+                null,
 
                 function failure(errorMsg) {
                     qq.log("Problem determining " + property + " for ID " + id + " (" + errorMsg + ")", "error");
+                }
+            );
+
+            return promise;
+        },
+
+        _determineObjectPropertyValue: function(id, property) {
+            debugger;
+            var promise = this._determinePropertyValue(id, this._options.objectProperties, property),
+                self = this;
+
+            promise.then(
+                function success(value) {
+                    self["_" + property + "s"][id] = value;
                 }
             );
 
@@ -322,6 +339,16 @@
 
         _determineHost: function(id) {
             return this._determineObjectPropertyValue(id, "host");
+        },
+
+        _determineRegion: function(id) {
+            debugger;
+            return this._determinePropertyValue(id, this._options.objectProperties, "region");
+        },
+
+        _determineSignatureEndpoint: function(id) {
+            debugger;
+            return this._determinePropertyValue(id, this._options.signature, "endpoint");
         },
 
         /**
