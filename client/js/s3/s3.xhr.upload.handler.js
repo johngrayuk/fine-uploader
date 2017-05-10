@@ -10,7 +10,6 @@
  */
 qq.s3.XhrUploadHandler = function(spec, proxy) {
     "use strict";
-
     var getName = proxy.getName,
         log = proxy.log,
         clockDrift = spec.clockDrift,
@@ -28,11 +27,12 @@ qq.s3.XhrUploadHandler = function(spec, proxy) {
         serverSideEncryption = spec.objectProperties.serverSideEncryption,
         validation = spec.validation,
         signature = {
-            customHeaders: spec.customHeaders,
-            version: spec.version,
+            credentialsProvider: spec.signature.credentialsProvider,
+            customHeaders: spec.signature.customHeaders,
+            version: spec.signature.version,
             drift: clockDrift,
-            getEndpoint: qq.bind(function (id) { return this.upload.signatureEndpoint.getName(id); }, this),
-            getRegion: qq.bind(function (id) { return this.upload.region.getName(id); }, this)
+            getEndpoint: qq.bind(function (id) { return upload.signatureEndpoint.getName(id); }, this),
+            getRegion: qq.bind(function (id) { return upload.region.getName(id); }, this)
         },
         handler = this,
         credentialsProvider = spec.signature.credentialsProvider,

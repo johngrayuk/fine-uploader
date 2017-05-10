@@ -28,6 +28,7 @@ qq.s3.FormUploadHandler = function(options, proxy) {
         serverSideEncryption = options.objectProperties.serverSideEncryption,
         validation = options.validation,
         signature = {
+            credentialsProvider: spec.credentialsProvider,
             customHeaders: spec.customHeaders,
             version: spec.version,
             drift: clockDrift,
