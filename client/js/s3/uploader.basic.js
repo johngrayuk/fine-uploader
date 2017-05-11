@@ -320,7 +320,6 @@
         },
 
         _determineObjectPropertyValue: function(id, property) {
-            debugger;
             var promise = this._determinePropertyValue(id, this._options.objectProperties, property),
                 self = this;
 
@@ -342,12 +341,10 @@
         },
 
         _determineRegion: function(id) {
-            debugger;
             return this._determinePropertyValue(id, this._options.objectProperties, "region");
         },
 
         _determineSignatureEndpoint: function(id) {
-            debugger;
             return this._determinePropertyValue(id, this._options.signature, "endpoint");
         },
 

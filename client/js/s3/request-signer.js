@@ -26,7 +26,7 @@ qq.s3.RequestSigner = function(o) {
         thisSignatureRequester = this,
         pendingSignatures = {},
         options = {
-            expectingPolicy: false,
+            expectingPolicy: false, 
             method: "POST",
             signatureSpec: {
                 drift: 0,
